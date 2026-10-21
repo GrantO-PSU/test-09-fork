@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#070a0d" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='25' y='10' width='50' height='80' fill='%23222' /%3E%3Crect x='30' y='20' width='40' height='60' fill='%23444' /%3E%3C/svg%3E"
+    />
+    <title>Test 09</title>
+  </head>
+  <body>
+    <main id="shell">
+      <canvas id="game" aria-label="Test 09 game canvas"></canvas>
+      <div id="tint" aria-hidden="true"></div>
+      <div id="flash" aria-hidden="true"></div>
+
+      <div id="hud">
+        <header class="brand">
+          <h1>TEST 09</h1>
+          <p>prototype</p>
+        </header>
+
+        <section class="mettle-panel" aria-label="Vigor and stamina">
+          <div class="health-row">
+            <span class="health-label">VIGOR</span>
+            <div class="health-track">
+              <div id="health-fill" class="health-fill"></div>
+            </div>
+            <span id="health-value" class="health-value">100</span>
+          </div>
+          <div class="mettle-head">
+            <span class="mettle-label">METTLE</span>
+            <span id="mettle-value" class="mettle-value">100%</span>
+          </div>
+          <div class="mettle-track">
+            <div id="mettle-fill" class="mettle-fill"></div>
+          </div>
+          <div class="stamina-track">
+            <div id="stamina-fill" class="stamina-fill"></div>
+          </div>
+        </section>
+
+        <div id="toast" class="toast" role="status"></div>
+
+        <aside class="controls" aria-label="Controls">
+          <div><kbd>W</kbd> jump <kbd>A</kbd><kbd>D</kbd> move</div>
+          <div><kbd>S</kbd> crouch/slide <kbd>J</kbd> attack</div>
+          <div><kbd>CTRL</kbd>+<kbd>A</kbd>/<kbd>D</kbd> roll</div>
+          <div><kbd>K</kbd> parry <kbd>F1</kbd> debug</div>
+        </aside>
+
+        <aside id="debug" class="debug" hidden>
+          <div class="debug-title">DEBUG <span>F1</span></div>
+          <pre id="debug-body"></pre>
+        </aside>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
