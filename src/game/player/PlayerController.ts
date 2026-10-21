@@ -11,6 +11,8 @@ import { moveBody } from '../physics/kinematic';
 import type { Mettle } from '../systems/Mettle';
 import { moveTowards } from '../util/math';
 
+export type WeaponType = 'sword' | 'spear' | 'greatsword';
+
 export interface PlayerInput {
   left: boolean;
   right: boolean;
@@ -33,7 +35,8 @@ export type ControllerEvent =
   | { type: 'parrySuccess' }
   | { type: 'bonk'; impact: number }
   | { type: 'drop' }
-  | { type: 'scrollDamage' };
+  | { type: 'spearThrow' }
+  | { type: 'weaponChange'; weapon: WeaponType };
 
 export type PlayerStateName =
   | 'idle' | 'run' | 'jump' | 'fall' | 'roll'
@@ -75,6 +78,11 @@ export class PlayerController {
 
   // Scroll damage cooldown
   scrollDamageCooldown = 0;
+
+  // Weapon system
+  currentWeapon: WeaponType = 'sword';
+  spearCharges = 0;
+  spearThrowing = false;
 
   constructor(x: number, y: number) {
     this.body = {
@@ -221,7 +229,19 @@ export class PlayerController {
 
     // --- Start an attack ---
     if (input.attackPressed && !this.isAttacking && !stunned && !this.isDead && this.rollTime <= 0) {
-      if (mettle.spend(COMBAT.mettleAttackCost)) {
+      if (this.currentWeapon === 'spear' && this.spearCharges > 0) {
+        // Spear throw
+        this.spearThrowing = true;
+        this.spearCharges -= 1;
+        this.crouching = false;
+        this.body.h = PLAYER.height;
+        this.facing = input.left || input.right ? (input.right ? 1 : -1) : this.facing;
+        events.push({ type: 'spearThrow' });
+        if (this.spearCharges <= 0) {
+          this.currentWeapon = 'sword';
+          events.push({ type: 'weaponChange', weapon: 'sword' });
+        }
+      } else if (mettle.spend(COMBAT.mettleAttackCost)) {
         this.crouching = false;
         this.body.h = PLAYER.height;
         this.facing = input.left || input.right ? (input.right ? 1 : -1) : this.facing;
@@ -398,6 +418,17 @@ export class PlayerController {
     this.invulnerable = 0;
     this.stun = 0;
     this.cancelAttack();
+    this.currentWeapon = 'sword';
+    this.spearCharges = 0;
+    this.spearThrowing = false;
+  }
+
+  equipWeapon(weapon: WeaponType): void {
+    this.currentWeapon = weapon;
+    if (weapon === 'spear') {
+      this.spearCharges = 3;
+    }
+    this.cancelAttack();
   }
 
   private startAttack(index: number, events: ControllerEvent[]): void {
@@ -409,7 +440,10 @@ export class PlayerController {
     this.attackTime = 0;
     this.attackId += 1;
     this.comboQueued = false;
-    this.attackDamage = attack.damage;
+
+    // Apply weapon damage multiplier
+    const weaponMul = this.currentWeapon === 'greatsword' ? 2.0 : 1.0;
+    this.attackDamage = attack.damage * weaponMul;
     this.attackReach = attack.reach;
 
     if (this.body.onGround) {

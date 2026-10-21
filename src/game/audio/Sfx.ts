@@ -66,6 +66,10 @@ export class Sfx {
     this.noise(0.12, 0.05, 'bandpass', 600, 2000);
     this.tone(150, 80, 0.1, 'triangle', 0.02);
   }
+  pickup(): void {
+    this.tone(660, 660, 0.07, 'sine', 0.04);
+    this.tone(990, 990, 0.1, 'sine', 0.035, 0.07);
+  }
   reset(): void {
     this.tone(300, 300, 0.1, 'triangle', 0.025);
     this.tone(400, 400, 0.12, 'triangle', 0.022, 0.08);

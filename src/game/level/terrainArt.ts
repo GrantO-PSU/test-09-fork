@@ -162,3 +162,63 @@ export function backgroundTerrain(width: number, height: number): Canvas {
     },
   });
 }
+
+export function spearPickupGraphic(): Canvas {
+  return new Canvas({
+    width: 32, height: 32,
+    cache: true, quality: 2,
+    draw: (ctx) => {
+      ctx.fillStyle = 'rgba(160, 180, 200, 0.3)';
+      ctx.beginPath();
+      ctx.arc(16, 16, 14, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#8888a0';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(8, 26);
+      ctx.lineTo(24, 8);
+      ctx.stroke();
+
+      ctx.fillStyle = '#a0a0b8';
+      ctx.beginPath();
+      ctx.moveTo(22, 4);
+      ctx.lineTo(26, 10);
+      ctx.lineTo(28, 6);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#66667a';
+      ctx.fillRect(12, 14, 10, 4);
+    },
+  });
+}
+
+export function greatswordPickupGraphic(): Canvas {
+  return new Canvas({
+    width: 32, height: 32,
+    cache: true, quality: 2,
+    draw: (ctx) => {
+      ctx.fillStyle = 'rgba(200, 160, 100, 0.3)';
+      ctx.beginPath();
+      ctx.arc(16, 16, 14, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#a08060';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(18, 28);
+      ctx.lineTo(14, 6);
+      ctx.stroke();
+
+      ctx.fillStyle = '#c0a070';
+      ctx.fillRect(8, 6, 14, 3);
+      ctx.fillRect(10, 4, 2, 8);
+
+      ctx.fillStyle = '#8a6a40';
+      ctx.fillRect(14, 10, 4, 8);
+    },
+  });
+}

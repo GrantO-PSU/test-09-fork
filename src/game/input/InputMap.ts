@@ -15,13 +15,11 @@ interface Held {
   roll: boolean;
   attack: boolean;
   parry: boolean;
-  ctrl: boolean;
 }
 
 const NONE: Held = {
   left: false, right: false, down: false,
   jump: false, roll: false, attack: false, parry: false,
-  ctrl: false,
 };
 
 export class InputMap {
@@ -46,13 +44,12 @@ export class InputMap {
       roll: kb.isHeld(Keys.ShiftLeft) || kb.isHeld(Keys.ShiftRight),
       attack: kb.isHeld(Keys.J),
       parry: kb.isHeld(Keys.K),
-      ctrl: kb.isHeld(Keys.ControlLeft) || kb.isHeld(Keys.ControlRight),
     };
 
-    // Roll = CTRL + left/right
+    // Roll = SHIFT + left/right
     const rollTriggered =
-      held.ctrl && (held.left || held.right) &&
-      !(this.previous.ctrl && (this.previous.left || this.previous.right));
+      held.roll && (held.left || held.right) &&
+      !(this.previous.roll && (this.previous.left || this.previous.right));
 
     const result: PlayerInput = {
       left: held.left,

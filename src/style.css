@@ -192,6 +192,34 @@ body {
   transition: width 0.08s linear;
 }
 
+/* ---------- weapon ---------- */
+
+.weapon-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(212, 196, 168, 0.08);
+  font-size: clamp(8px, 0.72vw, 10.5px);
+  letter-spacing: 0.06em;
+}
+
+.weapon-label {
+  color: rgba(212, 196, 168, 0.52);
+}
+
+.weapon-name {
+  color: #c0b090;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.weapon-charges {
+  margin-left: auto;
+  color: rgba(212, 196, 168, 0.62);
+}
+
 /* ---------- health ---------- */
 
 .health-row {

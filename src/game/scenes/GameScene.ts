@@ -1,11 +1,11 @@
-import { Actor, CollisionType, Scene, vec, type Engine } from 'excalibur';
+import { Actor, CollisionType, Scene, vec, type Engine, Color } from 'excalibur';
 import * as CONFIG from '../config';
-import { COMBAT, PHYSICS, VIEW } from '../config';
+import { COMBAT, VIEW } from '../config';
 import { overlaps } from '../physics/aabb';
 import type { CollisionWorld } from '../physics/kinematic';
 import { ROOM } from '../level/room';
 import { Background } from '../level/background';
-import { stoneGraphic, woodGraphic } from '../level/terrainArt';
+import { stoneGraphic, woodGraphic, spearPickupGraphic, greatswordPickupGraphic } from '../level/terrainArt';
 import { PlayerController, type ControllerEvent } from '../player/PlayerController';
 import { PlayerActor } from '../player/PlayerActor';
 import { EnemyController } from '../enemies/EnemyController';
@@ -15,9 +15,24 @@ import { ParticleSystem } from '../fx/Particles';
 import { Sfx } from '../audio/Sfx';
 import { Hud } from '../ui/Hud';
 import { InputMap } from '../input/InputMap';
-
+import { clamp } from '../util/math';
 
 const SPAWN = ROOM.spawn;
+
+interface PickupDef {
+  id: string;
+  x: number;
+  y: number;
+  kind: 'spear' | 'greatsword';
+}
+
+interface SpearProjectile {
+  actor: Actor;
+  vx: number;
+  vy: number;
+  life: number;
+  hit: boolean;
+}
 
 export class GameScene extends Scene {
   private controller!: PlayerController;
@@ -40,16 +55,22 @@ export class GameScene extends Scene {
     lastEnemyAttack: number;
   }[] = [];
 
-  /** Current scroll position (in world pixels, left edge of view). */
-  private scrollX = 0;
   private time = 0;
   private hudTimer = 0;
   private debugTimer = 0;
   private hitstop = 0;
   private deathTimer = 0;
   private debug = false;
-  /** Has the player reached the end? */
-  private levelComplete = false;
+
+  // Pickups
+  private pickups: {
+    def: PickupDef;
+    actor: Actor;
+    taken: boolean;
+  }[] = [];
+
+  // Spear projectiles
+  private spears: SpearProjectile[] = [];
 
   onInitialize(engine: Engine): void {
     this.engine = engine;
@@ -62,6 +83,7 @@ export class GameScene extends Scene {
 
     this.background = new Background(this);
     this.buildRoom();
+    this.buildPickups();
 
     this.player = new PlayerActor();
     this.add(this.player);
@@ -73,8 +95,7 @@ export class GameScene extends Scene {
     });
     this.hud.update(this.mettle, this.controller);
 
-    // Start camera at spawn
-    this.scrollX = 0;
+    // Start camera at spawn, following player
     this.camera.pos = vec(VIEW.width / 2, VIEW.height / 2);
 
     const unlock = () => this.sfx.unlock();
@@ -95,7 +116,7 @@ export class GameScene extends Scene {
     };
 
     window.setTimeout(() => {
-      this.hud.toast('FORWARD · SURVIVE · REACH THE END');
+      this.hud.toast('SURVIVE THE PATH');
     }, 650);
   }
 
@@ -113,26 +134,15 @@ export class GameScene extends Scene {
       this.deathTimer -= dt;
       if (this.deathTimer <= 0) { this.respawnFromDeath(); return; }
       this.particles.update(dt);
+      this.updateSpears(dt);
       this.updateHud(dt);
       return;
     }
 
-    if (this.levelComplete) return;
-
     this.time += dt;
 
-    // --- Forward scroll ---
-    this.scrollX += PHYSICS.scrollSpeed * dt;
-    if (this.scrollX > ROOM.endX - VIEW.width) {
-      this.scrollX = ROOM.endX - VIEW.width;
-      this.levelComplete = true;
-      this.hud.toast('THE PATH ENDS · FOR NOW', 'amber');
-    }
-
-    // Clamp camera to scroll
-    const cameraX = this.scrollX + VIEW.width / 2;
-    const cameraY = VIEW.height / 2;
-    this.camera.pos = vec(cameraX, cameraY);
+    // --- Camera follows player (no auto-scroll) ---
+    this.updateCamera(dt);
 
     // --- Input & systems ---
     const input = this.controls.sample();
@@ -140,17 +150,25 @@ export class GameScene extends Scene {
     const events = this.controller.step(input, dt, this.collisionWorld, this.mettle);
 
     this.handleEvents(events);
+
+    // Spear throw from controller
+    if (this.controller.currentWeapon === 'spear' && this.controller.spearThrowing) {
+      this.controller.spearThrowing = false;
+      this.throwSpear();
+    }
+
     this.resolvePlayerAttack();
     this.updateEnemies(dt);
-    this.checkScrollDamage();
 
     if (!this.controller.isDead) {
       this.checkFall();
+      this.handlePickups();
     }
 
     this.player.sync(this.controller, dt);
     this.background.update(this.camera.pos);
     this.particles.update(dt);
+    this.updateSpears(dt);
     this.updateHud(dt);
   }
 
@@ -178,6 +196,134 @@ export class GameScene extends Scene {
       actor.sync(0);
       this.enemies.push({ actor, lastPlayerAttack: -1, lastEnemyAttack: -1 });
     }
+  }
+
+  private buildPickups(): void {
+    const defs: PickupDef[] = [
+      { id: 'spear-1', x: 1100, y: 590, kind: 'spear' },
+      { id: 'spear-2', x: 2600, y: 590, kind: 'spear' },
+      { id: 'greatsword-1', x: 1800, y: 590, kind: 'greatsword' },
+    ];
+
+    for (const def of defs) {
+      const graphic = def.kind === 'spear' ? spearPickupGraphic() : greatswordPickupGraphic();
+      const actor = new Actor({
+        x: def.x, y: def.y,
+        z: 8,
+        graphic,
+      });
+      this.add(actor);
+      this.pickups.push({ def, actor, taken: false });
+    }
+  }
+
+  private handlePickups(): void {
+    const body = this.controller.body;
+    const cx = body.x + body.w / 2;
+    const cy = body.y + body.h / 2;
+
+    for (const p of this.pickups) {
+      if (p.taken) continue;
+      const dx = p.def.x - cx;
+      const dy = p.def.y - cy;
+      if (dx * dx + dy * dy > 40 * 40) continue;
+
+      p.taken = true;
+      p.actor.graphics.visible = false;
+      this.controller.equipWeapon(p.def.kind);
+      this.sfx.pickup();
+      this.hud.toast(p.def.kind === 'spear' ? 'SPEAR · 3 THROWS' : 'HEAVY GREATSWORD · 2x DAMAGE');
+    }
+  }
+
+  private throwSpear(): void {
+    const body = this.controller.body;
+    const startX = this.controller.facing === 1
+      ? body.x + body.w
+      : body.x - 20;
+    const startY = body.y + body.h / 2 - 6;
+
+    const actor = new Actor({
+      x: startX, y: startY,
+      width: 24, height: 6,
+      color: Color.fromHex('#8888a0'),
+      z: 25,
+    });
+    this.add(actor);
+
+    this.spears.push({
+      actor,
+      vx: this.controller.facing * 700,
+      vy: 0,
+      life: 1.5,
+      hit: false,
+    });
+
+    this.particles.jumpDust(startX, startY);
+  }
+
+  private updateSpears(dt: number): void {
+    for (let i = this.spears.length - 1; i >= 0; i--) {
+      const s = this.spears[i]!;
+      s.life -= dt;
+      if (s.life <= 0 || s.actor.pos.x > ROOM.width + 100 || s.actor.pos.x < -100) {
+        this.remove(s.actor);
+        s.actor.kill();
+        this.spears.splice(i, 1);
+        continue;
+      }
+
+      s.actor.pos = vec(s.actor.pos.x + s.vx * dt, s.actor.pos.y + s.vy * dt);
+
+      // Hit enemy check
+      if (!s.hit) {
+        const spearBox = {
+          x: s.actor.pos.x - 12, y: s.actor.pos.y - 3,
+          w: 24, h: 6,
+        };
+        for (const enemy of this.enemies) {
+          const m = enemy.actor.controller;
+          if (!m.isAlive) continue;
+          if (overlaps(spearBox, m.body)) {
+            s.hit = true;
+            const dmg = 25;
+            const result = m.takeDamage(dmg, m.centerX);
+            this.particles.hitSpark(m.centerX, m.centerY, '#a0a0c0');
+            this.particles.damageNumber(m.centerX, m.centerY - 12, `${dmg}`, '#a0a0c0');
+            this.sfx.hit(false);
+            if (result === 'dead') this.onEnemyKilled(enemy.actor);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  private updateCamera(dt: number): void {
+    const body = this.controller.body;
+    const cx = body.x + body.w / 2;
+    const cy = body.y + body.h / 2;
+
+    const halfW = VIEW.width / 2;
+    const halfH = VIEW.height / 2;
+    const minX = Math.min(halfW, ROOM.width - halfW);
+    const maxX = Math.max(halfW, ROOM.width - halfW);
+    const minY = Math.min(halfH, ROOM.height - halfH);
+    const maxY = Math.max(halfH, ROOM.height - halfH);
+
+    const lookAhead = clamp(body.vx * 0.1, -50, 50);
+    const desiredX = cx + lookAhead;
+    const delta = desiredX - this.camera.pos.x;
+    let targetX = this.camera.pos.x;
+    if (Math.abs(delta) > 60) {
+      targetX += delta - Math.sign(delta) * 60;
+    }
+
+    let x = lerpTowards(this.camera.pos.x, targetX, 9, dt);
+    x = clamp(x, minX, maxX);
+    let y = clamp(cy, minY, maxY);
+
+    this.camera.pos = vec(x, y);
   }
 
   private handleEvents(events: ControllerEvent[]): void {
@@ -215,9 +361,11 @@ export class GameScene extends Scene {
           this.particles.landDust(centerX, body.y, 260);
           this.camera.shake(2.5, 1.5, 100);
           break;
-        case 'scrollDamage':
-          this.sfx.scrollDamage();
-          this.particles.scrollDamageEffect(centerX, body.y + body.h / 2);
+        case 'spearThrow':
+          // handled in onPreUpdate before handleEvents
+          break;
+        case 'weaponChange':
+          this.hud.toast(event.weapon === 'spear' ? 'SPEAR · 3 THROWS' : 'HEAVY GREATSWORD · 2x DAMAGE');
           break;
       }
     }
@@ -310,26 +458,7 @@ export class GameScene extends Scene {
         }
       }
 
-      // Die if scrolled off-screen behind
-      if (monster.body.x + monster.body.w < this.scrollX - COMBAT.enemyScrollDeathDistance && monster.isAlive && monster.state !== 'dead') {
-        monster.health = 0;
-        monster.enter('dead', COMBAT.enemyDeathTime);
-      }
-
       enemy.actor.sync(dt);
-    }
-  }
-
-  private checkScrollDamage(): void {
-    // Player takes damage if they fall behind the scroll
-    const playerRight = this.controller.body.x + this.controller.body.w;
-    const scrollDanger = this.scrollX + PHYSICS.scrollLimit;
-    if (playerRight < scrollDanger && !this.controller.isDead && this.controller.scrollDamageCooldown <= 0) {
-      this.controller.scrollDamageCooldown = 0.5;
-      this.damagePlayer(5, this.controller.body.x - 100);
-      if (!this.controller.isDead) {
-        this.hud.toast('THE DARKNESS CONSUMES', 'red');
-      }
     }
   }
 
@@ -367,8 +496,8 @@ export class GameScene extends Scene {
     this.deathTimer = 0;
     this.hitstop = 0;
 
-    // Respawn at the current scroll position
-    const respawnX = this.scrollX + 120;
+    // Respawn at a safe spot near the player's last position
+    const respawnX = Math.max(80, this.controller.body.x);
     const respawnY = 540;
     this.controller.teleport(respawnX, respawnY);
     this.controller.resetCombat();
@@ -380,7 +509,6 @@ export class GameScene extends Scene {
     this.hud.update(this.mettle, this.controller);
     this.sfx.reset();
     this.particles.jumpDust(respawnX + 16, respawnY + 56);
-    this.camera.pos = vec(this.scrollX + VIEW.width / 2, VIEW.height / 2);
     this.player.sync(this.controller, 0);
   }
 
@@ -438,14 +566,15 @@ export class GameScene extends Scene {
   private debugText(): string {
     const body = this.controller.body;
     const stats = this.engine!.stats.currFrame;
+    const weaponName = this.controller.currentWeapon;
     return [
       `fps      ${stats.fps.toFixed(0)}`,
       `state    ${this.controller.stateName}`,
+      `weapon   ${weaponName}${weaponName === 'spear' ? ` (${this.controller.spearCharges})` : ''}`,
       `health   ${this.controller.health.toFixed(0)} / ${this.controller.maxHealth}`,
       `mettle   ${this.mettle.value.toFixed(0)} / ${this.mettle.max}${this.mettle.broken ? ' (BROKEN)' : ''}`,
       `pos      ${body.x.toFixed(1)}, ${body.y.toFixed(1)}`,
       `vel      ${body.vx.toFixed(0)}, ${body.vy.toFixed(0)}`,
-      `scroll   ${this.scrollX.toFixed(0)} / ${ROOM.endX}`,
       `ground   ${body.onGround}`,
       `coyote   ${(this.controller.coyote * 1000).toFixed(0)} ms`,
       `attack   ${this.controller.attackIndex >= 0 ? this.controller.attackIndex + 1 : '-'}`,
@@ -455,4 +584,9 @@ export class GameScene extends Scene {
       `actors   ${this.actors.length}`,
     ].join('\n');
   }
+}
+
+/** Frame-rate independent exponential interpolation towards a target. */
+function lerpTowards(current: number, target: number, lambda: number, dt: number): number {
+  return current + (target - current) * (1 - Math.exp(-lambda * dt));
 }

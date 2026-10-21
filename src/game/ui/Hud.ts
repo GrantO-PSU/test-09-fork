@@ -1,4 +1,4 @@
-import type { PlayerController } from '../player/PlayerController';
+import type { PlayerController, WeaponType } from '../player/PlayerController';
 import type { Mettle } from '../systems/Mettle';
 
 type ToastTone = 'amber' | 'red' | '';
@@ -13,6 +13,8 @@ export class Hud {
   private readonly flashEl = mustGet<HTMLElement>('flash');
   private readonly debugEl = mustGet<HTMLElement>('debug');
   private readonly debugBody = mustGet<HTMLElement>('debug-body');
+  private readonly weaponName = mustGet<HTMLElement>('weapon-name');
+  private readonly weaponCharges = mustGet<HTMLElement>('weapon-charges');
 
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -36,6 +38,29 @@ export class Hud {
     this.healthFill.style.width = `${healthRatio * 100}%`;
     this.healthFill.style.background = healthRatio > 0.5 ? '#8a3a2a' : healthRatio > 0.25 ? '#b05a30' : '#d03020';
     this.healthValue.textContent = `${Math.ceil(controller.health)}`;
+
+    // Weapon display
+    this.updateWeapon(controller.currentWeapon, controller.spearCharges);
+  }
+
+  private updateWeapon(weapon: WeaponType, spearCharges: number): void {
+    switch (weapon) {
+      case 'sword':
+        this.weaponName.textContent = 'SWORD';
+        this.weaponName.style.color = '#c0b090';
+        this.weaponCharges.textContent = '';
+        break;
+      case 'spear':
+        this.weaponName.textContent = 'SPEAR';
+        this.weaponName.style.color = '#a0b0c0';
+        this.weaponCharges.textContent = `${'●'.repeat(spearCharges)}${'○'.repeat(3 - spearCharges)}`;
+        break;
+      case 'greatsword':
+        this.weaponName.textContent = 'HEAVY GSWORD';
+        this.weaponName.style.color = '#d0a060';
+        this.weaponCharges.textContent = '2x DMG';
+        break;
+    }
   }
 
   toast(text: string, tone: ToastTone = 'amber'): void {
