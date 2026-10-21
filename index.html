@@ -19,7 +19,6 @@
       <div id="hud">
         <header class="brand">
           <h1>TEST 09</h1>
-          <p>prototype</p>
         </header>
 
         <section class="mettle-panel" aria-label="Vigor and stamina">
@@ -32,16 +31,12 @@
           </div>
           <div class="mettle-head">
             <span class="mettle-label">METTLE</span>
-            <span id="mettle-value" class="mettle-value">100%</span>
-          </div>
-          <div class="mettle-track">
-            <div id="mettle-fill" class="mettle-fill"></div>
-          </div>
-          <div class="stamina-track">
-            <div id="stamina-fill" class="stamina-fill"></div>
+            <div class="mettle-track">
+              <div id="mettle-fill" class="mettle-fill"></div>
+            </div>
           </div>
           <div id="weapon-display" class="weapon-row">
-            <span class="weapon-label">WEAPON</span>
+            <span class="weapon-label">⚔</span>
             <span id="weapon-name" class="weapon-name">SWORD</span>
             <span id="weapon-charges" class="weapon-charges"></span>
           </div>
@@ -50,10 +45,22 @@
         <div id="toast" class="toast" role="status"></div>
 
         <aside class="controls" aria-label="Controls">
-          <div><kbd>W</kbd> jump <kbd>A</kbd><kbd>D</kbd> move</div>
-          <div><kbd>S</kbd> crouch/slide <kbd>J</kbd> attack</div>
-          <div><kbd>SHIFT</kbd>+<kbd>A</kbd>/<kbd>D</kbd> roll</div>
-          <div><kbd>K</kbd> parry <kbd>F1</kbd> debug</div>
+          <div class="ctrl-group">
+            <span class="ctrl-cat">MOVEMENT</span>
+            <span><kbd>W</kbd> Jump</span>
+            <span><kbd>A</kbd> <kbd>D</kbd> Move</span>
+            <span><kbd>S</kbd> Crouch/Slide</span>
+            <span><kbd>Shift</kbd>+<kbd>A</kbd>/<kbd>D</kbd> Roll</span>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-cat">COMBAT</span>
+            <span><kbd>J</kbd> Attack / Throw</span>
+            <span><kbd>K</kbd> Parry</span>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-cat">OTHER</span>
+            <span><kbd>F1</kbd> Debug</span>
+          </div>
         </aside>
 
         <aside id="debug" class="debug" hidden>

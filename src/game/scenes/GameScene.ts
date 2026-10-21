@@ -200,9 +200,9 @@ export class GameScene extends Scene {
 
   private buildPickups(): void {
     const defs: PickupDef[] = [
-      { id: 'spear-1', x: 1100, y: 590, kind: 'spear' },
-      { id: 'spear-2', x: 2600, y: 590, kind: 'spear' },
-      { id: 'greatsword-1', x: 1800, y: 590, kind: 'greatsword' },
+      { id: 'spear-1', x: 1400, y: 570, kind: 'spear' },
+      { id: 'spear-2', x: 3350, y: 550, kind: 'spear' },
+      { id: 'greatsword-1', x: 2700, y: 582, kind: 'greatsword' },
     ];
 
     for (const def of defs) {
