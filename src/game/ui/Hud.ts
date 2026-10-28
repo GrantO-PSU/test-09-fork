@@ -10,6 +10,7 @@ export class Hud {
   private readonly healthFill = mustGet<HTMLElement>('health-fill');
   private readonly healthValue = mustGet<HTMLElement>('health-value');
   private readonly toastEl = mustGet<HTMLElement>('toast');
+  private readonly victoryEl = mustGet<HTMLElement>('victory');
   private readonly flashEl = mustGet<HTMLElement>('flash');
   private readonly debugEl = mustGet<HTMLElement>('debug');
   private readonly debugBody = mustGet<HTMLElement>('debug-body');
@@ -68,6 +69,10 @@ export class Hud {
     this.toastEl.textContent = text;
     this.toastEl.className = `toast show ${tone}`.trim();
     this.toastTimer = setTimeout(() => { this.toastEl.classList.remove('show'); this.toastTimer = null; }, 1550);
+  }
+
+  showVictory(): void {
+    this.victoryEl.hidden = false;
   }
 
   flash(): void {
