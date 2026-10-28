@@ -21,6 +21,38 @@ export const ENEMY = {
   height: 60,
 } as const;
 
+/**
+ * The Moth Mother — the level boss. She is a flying enemy, so none of the
+ * ground-bound physics tuning above applies to her.
+ */
+export const BOSS = {
+  width: 116,
+  height: 92,
+  maxHealth: 260,
+  /** Distance from the arena floor to her feet while hovering. */
+  hoverHeight: 120,
+  hoverAmplitude: 16,
+  hoverSpeed: 40,
+  aggroRange: 820,
+  /** Telegraph before a dive. */
+  diveTelegraphTime: 0.7,
+  diveSpeed: 700,
+  diveTime: 0.55,
+  diveActiveStart: 0.05,
+  diveActiveEnd: 0.4,
+  /** How long she takes to climb back to hover altitude after a dive. */
+  riseTime: 1.0,
+  cooldown: 1.4,
+  /** Below this fraction of health she enters her enraged phase. */
+  phaseTwoAt: 0.5,
+  contactDamage: 20,
+  /** Parry knock-down: she hits the floor and stays vulnerable. */
+  stunTime: 1.5,
+  /** Short flinch when hit. */
+  hurtTime: 0.3,
+  deathTime: 1.8,
+} as const;
+
 export const PHYSICS = {
   maxRunSpeed: 320,
   groundAccel: 2800,

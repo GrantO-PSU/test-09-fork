@@ -16,8 +16,13 @@ export class Hud {
   private readonly debugBody = mustGet<HTMLElement>('debug-body');
   private readonly weaponName = mustGet<HTMLElement>('weapon-name');
   private readonly weaponCharges = mustGet<HTMLElement>('weapon-charges');
+  private readonly bossPanel = mustGet<HTMLElement>('boss-panel');
+  private readonly bossName = mustGet<HTMLElement>('boss-name');
+  private readonly bossValue = mustGet<HTMLElement>('boss-value');
+  private readonly bossFill = mustGet<HTMLElement>('boss-fill');
 
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  private bossPercent = -1;
 
   update(mettle: Mettle, controller: PlayerController): void {
     const mettleRatio = mettle.ratio;

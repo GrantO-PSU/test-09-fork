@@ -1,23 +1,28 @@
-import { Actor, CollisionType, vec } from 'excalibur';
-import { ENEMY } from '../config';
-import type { EnemyController } from './EnemyController';
+import { Actor, CollisionType, vec, type Canvas } from 'excalibur';
+import type { HostileController } from './EnemyController';
 import { EnemyRig } from './EnemyRig';
 
-export class EnemyActor extends Actor {
-  readonly controller: EnemyController;
-  private readonly rig: EnemyRig;
+/** A procedural visual that follows a hostile controller. */
+export interface HostileRig {
+  readonly graphic: Canvas;
+  update(dt: number, controller: HostileController): void;
+}
 
-  constructor(controller: EnemyController, name = 'hollow-knight') {
+export class EnemyActor extends Actor {
+  readonly controller: HostileController;
+  private readonly rig: HostileRig;
+
+  constructor(controller: HostileController, name = 'hollow-knight', rig?: HostileRig) {
     super({
       name,
-      width: ENEMY.width,
-      height: ENEMY.height,
+      width: controller.body.w,
+      height: controller.body.h,
       anchor: vec(0.5, 0.5),
       collisionType: CollisionType.Passive,
       z: 15,
     });
     this.controller = controller;
-    this.rig = new EnemyRig(controller);
+    this.rig = rig ?? new EnemyRig(controller);
     this.graphics.add(this.rig.graphic);
   }
 

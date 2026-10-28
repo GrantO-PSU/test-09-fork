@@ -1,4 +1,5 @@
 import type { Rect } from '../physics/aabb';
+import { ENEMY } from '../config';
 
 export type SolidKind = 'stone' | 'wood';
 
@@ -9,10 +10,25 @@ export interface SolidDef extends Rect {
 export interface EnemySpawnDef {
   id: string;
   x: number;
-  y: number;
+  /**
+   * Y of the solid top this enemy stands on. The body's Y is derived from this
+   * so the feet always rest exactly on the surface — never sunk into it, which
+   * would make the horizontal collision pass shove the enemy sideways.
+   */
+  groundTop: number;
   patrolMin: number;
   patrolMax: number;
   maxHealth?: number;
+}
+
+export interface BossSpawnDef {
+  id: string;
+  x: number;
+  groundTop: number;
+  /** Horizontal bounds (body centres) the flying boss is confined to. */
+  arenaMin: number;
+  arenaMax: number;
+  maxHealth: number;
 }
 
 export interface RoomData {
@@ -22,12 +38,18 @@ export interface RoomData {
   solids: SolidDef[];
   oneWays: Rect[];
   enemies: EnemySpawnDef[];
+  boss: BossSpawnDef;
   endX: number;
+}
+
+/** Feet-on-the-floor Y for a ground enemy. */
+export function enemySpawnY(spawn: EnemySpawnDef): number {
+  return spawn.groundTop - ENEMY.height;
 }
 
 /**
  * The graveyard path. A ruined cemetery with uneven terrain, collapsed crypts,
- * and hollow knights guarding the way to Gorbox's arena.
+ * and hollow knights guarding the way to the Moth Mother's arena.
  */
 export const ROOM: RoomData = {
   width: 6400,
@@ -46,7 +68,8 @@ export const ROOM: RoomData = {
     { x: 900, y: 600, w: 350, h: 120, kind: 'stone' },
 
     // === Collapsed crypt platform (mid-air) ===
-    { x: 1100, y: 520, w: 80, h: 24, kind: 'stone' },
+    // Sits high enough that a 60px-tall enemy can walk underneath it.
+    { x: 1100, y: 500, w: 80, h: 24, kind: 'stone' },
 
     // === Graveyard ground section with uneven terrain ===
     { x: 1400, y: 620, w: 500, h: 100, kind: 'stone' },
@@ -90,10 +113,10 @@ export const ROOM: RoomData = {
     // Boss arena floor — wide and flat
     { x: 5500, y: 600, w: 900, h: 120, kind: 'stone' },
 
-    // Arena pillars (decorative)
-    { x: 5550, y: 440, w: 32, h: 160, kind: 'stone' },
-    { x: 5850, y: 440, w: 32, h: 160, kind: 'stone' },
-    { x: 6150, y: 440, w: 32, h: 160, kind: 'stone' },
+    // Arena pillars (decorative, broken stumps — clear of the boss's hover lane)
+    { x: 5550, y: 520, w: 32, h: 80, kind: 'stone' },
+    { x: 5850, y: 520, w: 32, h: 80, kind: 'stone' },
+    { x: 6150, y: 520, w: 32, h: 80, kind: 'stone' },
 
     // === Right wall ===
     { x: 6368, y: 0, w: 32, h: 640, kind: 'stone' },
@@ -105,14 +128,27 @@ export const ROOM: RoomData = {
     { x: 2100, y: 600, w: 80, h: 10 },
   ],
   enemies: [
-    { id: 'hk-1', x: 500, y: 542, patrolMin: 300, patrolMax: 650 },
-    { id: 'hk-2', x: 1200, y: 542, patrolMin: 950, patrolMax: 1380 },
-    { id: 'hk-3', x: 1500, y: 562, patrolMin: 1420, patrolMax: 1750 },
-    { id: 'hk-4', x: 2200, y: 562, patrolMin: 2130, patrolMax: 2450 },
-    { id: 'hk-5', x: 2700, y: 582, patrolMin: 2670, patrolMax: 2950 },
-    { id: 'hk-6', x: 3400, y: 582, patrolMin: 3320, patrolMax: 3650 },
-    { id: 'hk-7', x: 4000, y: 602, patrolMin: 3920, patrolMax: 4250 },
-    { id: 'hk-8', x: 4600, y: 582, patrolMin: 4420, patrolMax: 4750 },
-    { id: 'hk-9', x: 5100, y: 562, patrolMin: 5020, patrolMax: 5350 },
+    // Five chaff hollow knights, each planted on a wide flat stretch away from
+    // every ledge, so patrol and chase can never walk them into a pit.
+    // Opening stretch — solid spans x 32..700 at y=600. Kept far enough down
+    // the path that it does not aggro the player while the page is still
+    // loading, so nobody takes a hit before touching the keyboard.
+    { id: 'chaff-1', x: 600, groundTop: 600, patrolMin: 470, patrolMax: 640 },
+    // Landing after the first pit — solid spans x 900..1250 at y=600.
+    { id: 'chaff-2', x: 1000, groundTop: 600, patrolMin: 950, patrolMax: 1200 },
+    // Crypt staircase landing — solid spans x 3300..3800 at y=640, steps end 3510.
+    { id: 'chaff-3', x: 3660, groundTop: 640, patrolMin: 3560, patrolMax: 3740 },
+    // Catacomb pocket between the broken archways — solid x 3900..4300 at y=660.
+    { id: 'chaff-4', x: 4080, groundTop: 660, patrolMin: 4000, patrolMax: 4170 },
+    // Final approach — solid spans x 5000..5400 at y=620.
+    { id: 'chaff-5', x: 5220, groundTop: 620, patrolMin: 5100, patrolMax: 5340 },
   ],
+  boss: {
+    id: 'moth-mother',
+    x: 6000,
+    groundTop: 600,
+    arenaMin: 5620,
+    arenaMax: 6300,
+    maxHealth: 260,
+  },
 };
