@@ -1,6 +1,6 @@
 import { Canvas } from 'excalibur';
 import { COMBAT } from '../config';
-import type { EnemyController } from './EnemyController';
+import type { HostileController } from './EnemyController';
 import { clamp, damp } from '../util/math';
 
 const W = 140;
@@ -13,13 +13,13 @@ const H = 160;
 export class EnemyRig {
   readonly graphic: Canvas;
 
-  private readonly controller: EnemyController;
+  private readonly controller: HostileController;
   private time = 0;
   private walkPhase = 0;
   private lean = 0;
   private flash = 0;
 
-  constructor(controller: EnemyController) {
+  constructor(controller: HostileController) {
     this.controller = controller;
     this.graphic = new Canvas({
       width: W, height: H,
@@ -29,7 +29,7 @@ export class EnemyRig {
     });
   }
 
-  update(dt: number, controller: EnemyController): void {
+  update(dt: number, controller: HostileController): void {
     this.time += dt;
     this.walkPhase += (Math.abs(controller.body.vx) * dt) / 26;
     this.lean = damp(this.lean, clamp(controller.body.vx / 350, -0.35, 0.35), 10, dt);
@@ -220,7 +220,7 @@ export class EnemyRig {
     }
   }
 
-  private swordAngle(c: EnemyController): number {
+  private swordAngle(c: HostileController): number {
     if (c.state === 'windup') {
       const progress = 1 - c.stateTimer / COMBAT.enemyWindup;
       return lerp(0.3, -2.0, clamp(progress * 1.6, 0, 1));

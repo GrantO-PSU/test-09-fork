@@ -3,13 +3,15 @@ import * as CONFIG from '../config';
 import { COMBAT, VIEW } from '../config';
 import { overlaps } from '../physics/aabb';
 import type { CollisionWorld } from '../physics/kinematic';
-import { ROOM } from '../level/room';
+import { ROOM, enemySpawnY } from '../level/room';
 import { Background } from '../level/background';
 import { stoneGraphic, woodGraphic, spearPickupGraphic, greatswordPickupGraphic } from '../level/terrainArt';
 import { PlayerController, type ControllerEvent } from '../player/PlayerController';
 import { PlayerActor } from '../player/PlayerActor';
 import { EnemyController } from '../enemies/EnemyController';
 import { EnemyActor } from '../enemies/EnemyActor';
+import { MothmanController } from '../enemies/MothmanController';
+import { MothmanRig } from '../enemies/MothmanRig';
 import { Mettle } from '../systems/Mettle';
 import { ParticleSystem } from '../fx/Particles';
 import { Sfx } from '../audio/Sfx';
@@ -51,9 +53,14 @@ export class GameScene extends Scene {
 
   private enemies: {
     actor: EnemyActor;
+    kind: 'chaff' | 'boss';
     lastPlayerAttack: number;
     lastEnemyAttack: number;
   }[] = [];
+
+  private boss: EnemyActor | null = null;
+  private bossIntroShown = false;
+  private bossDefeated = false;
 
   private time = 0;
   private hudTimer = 0;
@@ -111,6 +118,7 @@ export class GameScene extends Scene {
       controller: this.controller,
       mettle: this.mettle,
       enemies: this.enemies,
+      boss: this.boss,
       room: ROOM,
       config: CONFIG,
     };
@@ -188,14 +196,26 @@ export class GameScene extends Scene {
     }
 
     for (const spawn of ROOM.enemies) {
+      // Feet rest exactly on the spawn surface — never sunk into it.
       const controller = new EnemyController(
-        spawn.x, spawn.y, spawn.patrolMin, spawn.patrolMax, spawn.maxHealth,
+        spawn.x, enemySpawnY(spawn), spawn.patrolMin, spawn.patrolMax, spawn.maxHealth,
       );
       const actor = new EnemyActor(controller, spawn.id);
       this.add(actor);
       actor.sync(0);
-      this.enemies.push({ actor, lastPlayerAttack: -1, lastEnemyAttack: -1 });
+      this.enemies.push({ actor, kind: 'chaff', lastPlayerAttack: -1, lastEnemyAttack: -1 });
     }
+
+    // The Moth Mother, waiting in her arena.
+    const bossDef = ROOM.boss;
+    const bossController = new MothmanController(
+      bossDef.x, bossDef.groundTop, bossDef.arenaMin, bossDef.arenaMax, bossDef.maxHealth,
+    );
+    const bossActor = new EnemyActor(bossController, bossDef.id, new MothmanRig(bossController));
+    this.add(bossActor);
+    bossActor.sync(0);
+    this.boss = bossActor;
+    this.enemies.push({ actor: bossActor, kind: 'boss', lastPlayerAttack: -1, lastEnemyAttack: -1 });
   }
 
   private buildPickups(): void {
@@ -413,11 +433,24 @@ export class GameScene extends Scene {
 
   private onEnemyKilled(enemy: EnemyActor): void {
     const monster = enemy.controller;
+    const isBoss = enemy === this.boss;
+
     this.particles.enemyDeathBurst(monster.centerX, monster.centerY);
-    this.particles.damageNumber(monster.centerX, monster.centerY - 28, 'VANQUISHED', '#c0a080');
+    this.particles.damageNumber(
+      monster.centerX,
+      monster.centerY - 28,
+      isBoss ? 'THE MOTH MOTHER FALLS' : 'VANQUISHED',
+      '#c0a080',
+    );
     this.sfx.enemyDeath();
-    this.camera.shake(4, 3, 160);
-    this.hitstop = Math.max(this.hitstop, 0.11);
+    this.camera.shake(isBoss ? 9 : 4, isBoss ? 6 : 3, isBoss ? 420 : 160);
+    this.hitstop = Math.max(this.hitstop, isBoss ? 0.2 : 0.11);
+
+    if (isBoss) {
+      this.bossDefeated = true;
+      this.hud.toast('THE MOTH MOTHER FALLS', 'amber');
+      window.setTimeout(() => this.hud.hideBoss(), 1400);
+    }
   }
 
   private updateEnemies(dt: number): void {
@@ -437,6 +470,21 @@ export class GameScene extends Scene {
         else if (event.type === 'attack') this.sfx.enemyAttack();
       }
 
+      // Safety net: nothing is allowed to fall out of the world through a pit.
+      // Chaff are returned to their spawn ledge; the boss is clamped to hers.
+      if (monster.body.y > ROOM.height + 80) {
+        if (enemy.kind === 'boss') {
+          monster.body.y = ROOM.boss.groundTop - monster.body.h;
+          monster.body.vy = 0;
+          monster.body.onGround = true;
+        } else {
+          monster.placeAtSpawn();
+          enemy.actor.sync(0);
+          this.particles.jumpDust(monster.centerX, monster.centerY + monster.body.h / 2);
+          continue;
+        }
+      }
+
       // Check parry
       const parryBox = this.controller.getParryBox();
       if (parryBox && monster.attackActive && overlaps(parryBox, monster.body)) {
@@ -454,7 +502,7 @@ export class GameScene extends Scene {
         const attackBox = monster.getAttackBox();
         if (attackBox && enemy.lastEnemyAttack !== monster.attackId && overlaps(attackBox, player)) {
           enemy.lastEnemyAttack = monster.attackId;
-          this.damagePlayer(COMBAT.enemyDamage, monster.centerX);
+          this.damagePlayer(monster.contactDamage, monster.centerX);
         }
       }
 
@@ -520,6 +568,8 @@ export class GameScene extends Scene {
       enemy.lastPlayerAttack = -1;
       enemy.lastEnemyAttack = -1;
     }
+    this.bossDefeated = false;
+    this.hud.hideBoss();
   }
 
   private checkFall(): void {
@@ -545,6 +595,7 @@ export class GameScene extends Scene {
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.05;
       this.hud.update(this.mettle, this.controller);
+      this.updateBossHud();
     }
 
     if (this.debug) {
@@ -561,6 +612,29 @@ export class GameScene extends Scene {
     this.engine!.toggleDebug();
     this.hud.setDebugVisible(this.debug);
     if (this.debug) { this.debugTimer = 0; this.hud.setDebugText(this.debugText()); }
+  }
+
+  /** Boss health bar + arena introduction. */
+  private updateBossHud(): void {
+    if (!this.boss) return;
+
+    if (this.bossDefeated) {
+      this.hud.hideBoss();
+      return;
+    }
+
+    const monster = this.boss.controller;
+    const nearArena = this.controller.body.x > ROOM.boss.arenaMin - 340;
+
+    if (!this.bossIntroShown && nearArena) {
+      this.bossIntroShown = true;
+      this.hud.toast('THE MOTH MOTHER', 'red');
+      this.sfx.enemyWindup();
+    }
+
+    if (nearArena && monster.isAlive) {
+      this.hud.setBoss('THE MOTH MOTHER', monster.health, monster.maxHealth);
+    }
   }
 
   private debugText(): string {

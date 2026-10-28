@@ -16,7 +16,38 @@ export interface EnemyPlayerInfo {
   x: number; y: number; w: number; h: number; alive: boolean;
 }
 
-export class EnemyController {
+/**
+ * Everything the scene and the enemy rigs need from a hostile. Implemented by
+ * the regular ground enemies and by the flying boss.
+ */
+export interface HostileController {
+  readonly body: Body;
+  readonly maxHealth: number;
+  health: number;
+  state: EnemyState;
+  stateTimer: number;
+  facing: 1 | -1;
+  attackId: number;
+  attackCooldown: number;
+  removed: boolean;
+  readonly centerX: number;
+  readonly centerY: number;
+  readonly isAlive: boolean;
+  readonly showHealthBar: boolean;
+  readonly deathProgress: number;
+  readonly attackActive: boolean;
+  /** Damage dealt to the player when this hostile connects. */
+  readonly contactDamage: number;
+  getAttackBox(): Rect | null;
+  step(dt: number, world: CollisionWorld, player: EnemyPlayerInfo): EnemyEvent[];
+  parryStun(): void;
+  takeDamage(amount: number, sourceX: number): 'hit' | 'dead' | 'ignored';
+  reset(): void;
+  /** Put the body back on its spawn point without healing or changing state. */
+  placeAtSpawn(): void;
+}
+
+export class EnemyController implements HostileController {
   readonly body: Body;
   readonly maxHealth: number;
   readonly patrolMin: number;
@@ -59,6 +90,7 @@ export class EnemyController {
   get centerX(): number { return this.body.x + this.body.w / 2; }
   get centerY(): number { return this.body.y + this.body.h / 2; }
   get isAlive(): boolean { return this.state !== 'dead'; }
+  get contactDamage(): number { return COMBAT.enemyDamage; }
   get showHealthBar(): boolean {
     return this.health < this.maxHealth || this.provoked > 0 || this.state !== 'patrol';
   }
@@ -214,6 +246,20 @@ export class EnemyController {
     this.attackCooldown = 0;
     this.provoked = 0;
     this.removed = false;
+  }
+
+  /**
+   * Safety net: if an enemy is knocked into a pit it is put back on its spawn
+   * ledge (keeping its current health) instead of falling out of the world.
+   */
+  placeAtSpawn(): void {
+    this.body.x = this.spawnX;
+    this.body.y = this.spawnY;
+    this.body.vx = 0;
+    this.body.vy = 0;
+    this.body.onGround = false;
+    this.body.standingOnOneWay = false;
+    if (this.state !== 'dead') this.enter('patrol', 0);
   }
 
   enter(state: EnemyState, timer = 0): void {
